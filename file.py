@@ -115,7 +115,6 @@ class File:
 
         if encrypted:
             salt, payload = crypto.encryptData(bytes(unencrypted_bytes), password)
-            print(salt)
         else:
             payload = bytes(unencrypted_bytes)
 
@@ -143,8 +142,6 @@ class File:
     @staticmethod
     def fromBitstring(bitstring, password=None):
 
-        print("FROM BITSTRING")
-
         #Creating new File object
         file = File()
 
@@ -159,7 +156,7 @@ class File:
 
         #Encryption
         if bitstring_bytes[position] != 0 and bitstring_bytes[position] != 255:
-            print("Corruption in the first byte!")
+            print('not steganographic')
         #Setting whether there is encryption or not
         file.encrypted = bool(bitstring_bytes[position] & 1)
         position += 1
@@ -168,8 +165,6 @@ class File:
         if file.encrypted:
             salt = bitstring_bytes[position:position+File.SALT_BYTES]
             position += File.SALT_BYTES
-
-            print(salt)
 
         #Length
         payload_length = bytes2int(bitstring_bytes[position:position + File.LENGTH_BYTES])
@@ -216,22 +211,4 @@ class File:
     def save(self, name):
         with open(name + '.' + self.extension, 'wb') as f:
             f.write(self.data)
-        
-
-        
-if __name__ == '__main__':    
-    b = File.open('samples/audio/90-500.wav')
-
-    bs = b.makeBitstring(encrypted = True)
-
-    #Make true to simulate corruption
-    simulate_corruption = False
-    if (simulate_corruption == True):
-        lbs = list(bs)
-        lbs[2400] = str(int(bs[160], 2) ^ 1)
-        bs = ''.join(lbs)
-
-
-    output = File.fromBitstring(bs)
-
-
+ 

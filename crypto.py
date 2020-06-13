@@ -7,17 +7,20 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import getpass
 
 
-def getPass():
-    passphrase = getpass.getpass('Enter a passphrase: ')
-    if passphrase == getpass.getpass('Verify your passphrase: '):
-        return passphrase
+def getPass(verify=False):
+    if verify: 
+        passphrase = getpass.getpass('Enter a passphrase: ')
+        if passphrase == getpass.getpass('Verify your passphrase: '):
+            return passphrase
+        else:
+            print("Passwords do not match. Try again.")
+            return getPass()
     else:
-        print("Passwords do not match. Try again.")
-        return getPass()
+        return getpass.getpass('Enter the passphrase: ')
 
-def generateCustomKey(password, salt=None):
+def generateCustomKey(password, salt=None, verify=False):
     if password == None:
-        password = getPass()
+        password = getPass(verify=verify)
     
     if salt == None:
         salt = os.urandom(16)
@@ -36,7 +39,7 @@ def generateCustomKey(password, salt=None):
     return salt, key
 
 def encryptData(data, password=None):
-    salt, key = generateCustomKey(password)
+    salt, key = generateCustomKey(password, verify=True)
 
     f = Fernet(key)
     token = f.encrypt(data)
@@ -47,8 +50,11 @@ def decryptData(token, salt, password=None):
     _, key = generateCustomKey(password, salt)
     
     f = Fernet(key)
-    data = f.decrypt(token)
-
-    return data
+    try:
+        data = f.decrypt(token)
+        return data
+    except:
+        print("Passphrase is invalid.")
+        exit()
 
 

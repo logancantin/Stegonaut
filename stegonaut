@@ -1,0 +1,122 @@
+#!/Library/Frameworks/Python.framework/Versions/3.8/bin/python3.8
+
+import argparse
+import os
+import imgsteg
+
+#Constants
+SUPPORTED_AUDIO_TYPES = ['wav']
+LOSSLESS_AUDIO_TYPES = ['wav']
+LOSSLESS_IMAGE_TYPES = ['bmp', 'png']
+SUPPORTED_IMAGE_TYPES = ['jpg', 'jpeg', 'gif', 'bmp', 'png']
+
+SUPPORTED_ENCODING_TECHNIQUES = ['lsb']
+
+#Utility functions
+def filetype(path):
+    filename = path.split('/')[-1]
+    return filename[filename.find('.')+1:]
+
+parser = argparse.ArgumentParser('stegonaut', description="Hide information in plain sight!")
+subparsers = parser.add_subparsers(dest='operation')
+
+# Hiding information
+hide_parser = subparsers.add_parser('hide', help='Hide a secret file or message inside a carrier file.')
+hide_parser.add_argument('carrier', help='The file which you will use to store the secret information. Supported file types are {} and {}.'.format(SUPPORTED_IMAGE_TYPES, SUPPORTED_AUDIO_TYPES))
+hide_parser.add_argument('secret', help='The file that you want to conceal. All file tygg')
+hide_parser.add_argument('-e', '--encrypted', action='store_true', help='Encrypt the payload using AES 256-bit encryption.')
+hide_parser.add_argument('-p', '--password', help='If encryption is set to true, use this password to encrypt the payload. Otherwise, you will be asked a password later.')
+hide_parser.add_argument('-o', '--output', help='The name of the steganographic file to be created. Supported file types are {} and {}.'.format(LOSSLESS_IMAGE_TYPES, LOSSLESS_AUDIO_TYPES))
+hide_parser.add_argument('-m', '--mode', choices=SUPPORTED_ENCODING_TECHNIQUES, default=SUPPORTED_ENCODING_TECHNIQUES[0])
+hide_parser.add_argument('--preview', action='store_true', help='Show the steganographic file once it has been created.')
+
+# Retrieve
+retrieve_parser = subparsers.add_parser('retrieve', help='Retrieve the secret file from a steganographic file.')
+retrieve_parser.add_argument('stegfile', help='Steganographic file from which you want to extract information.')
+retrieve_parser.add_argument('-p', '--password', help='Specify the password used to encrypt the file. If not specified here, it will be asked later.')
+retrieve_parser.add_argument('-m', '--mode', choices=['lsb'], default='lsb', help='Method of encoding the data.')
+retrieve_parser.add_argument('-o', '--output', help='File name of the payload.')
+
+
+args = parser.parse_args()
+
+#User wants to do a hide operation
+if args.operation=='hide':
+
+    #Error Checking
+    if not os.path.exists(args.carrier):
+        print('Supplied carrier ({}) does not exist.'.format(args.carrier))
+        exit()
+    if not os.path.exists(args.secret):
+        print('Supplied secret file ({}) does not exist.'.format(args.secret))
+        exit()
+    carrier_filetype = filetype(args.carrier)
+    output_filetype = filetype(args.output) if args.output != None else None
+
+    #LSB Encoding Mode
+    if args.mode == 'lsb':
+        
+        #Image lsb
+        if carrier_filetype in SUPPORTED_IMAGE_TYPES:
+            
+            #Output must be in a lossless format
+            if output_filetype != None and output_filetype not in LOSSLESS_IMAGE_TYPES:
+                print('Output file type must use lossless compression. Supported file types are: {}'.format(LOSSLESS_IMAGE_TYPES))
+                exit()
+
+            #Performing Image LSB
+            im = imgsteg.encodeRGB(args.carrier, args.secret, args.password, args.encrypted)
+        
+            #Showing the image if preview flag was selected
+            if args.preview:
+                im.show()
+            
+            #Naming and saving the file
+            name = 'stegfile.png' if args.output == None else args.output
+            im.save(name)
+            
+        
+        #Audio LSB
+        elif carrier_filetype in SUPPORTED_AUDIO_TYPES:
+
+            #Output must be in a lossless format
+            if output_filetype != None and output_filetype not in LOSSLESS_AUDIO_TYPES:
+                print('Output file type must use lossless compression. Supported file types are: {}'.format(LOSSLESS_AUDIO_TYPES))
+                exit()
+
+            #TODO: Implement Audio LSB
+            print('Audio LSB is not currently supported.')
+
+        #Not supported
+        else:
+            print('The carrier file that you supplied is not supported. The file types supported for Image and Audio LSB encoding are {} and {}, respectfully.'.format(SUPPORTED_IMAGE_TYPES, SUPPORTED_AUDIO_TYPES))
+            exit()
+
+        
+#User wants to retrieve information from a steganographic file
+elif args.operation=='retrieve':
+
+    #Error checking
+    if not os.path.exists(args.stegfile):
+        print('The steganographic file does not exist.')
+        exit()
+    stegfile_extension = filetype(args.stegfile)
+
+    #LSB mode
+    if args.mode == 'lsb':
+
+        #Image LSB
+        if stegfile_extension in LOSSLESS_IMAGE_TYPES:
+            file = imgsteg.decodeRGB(args.stegfile, args.password)
+            file.save(args.output if args.output != None else 'secret')
+
+        #Audio LSB
+        elif stegfile_extension in LOSSLESS_AUDIO_TYPES:
+            print('Audio LSB is not currently supported!')
+
+        else:
+            print("The file you supplied ({}) is not a steganographic file created by this program.".format(args.stegfile))
+
+
+else:
+    parser.print_help()

@@ -3,12 +3,13 @@ import numpy as np
 import sys
 from file import File
 
+#Utility Functions
+
 # Value must be 1 or 0
 def setbit(num, index, value):
     mask = np.ones(num.size, dtype='uint8') << index
-    num &= ~ mask #Clearing the bit
-    num |= value #Setting the bit to the value
-    return num
+    temp = num & ~ mask #Clearing the bit
+    return temp | value #Setting the bit to the value
 
 
 def readbit(num, index):
@@ -74,19 +75,31 @@ def bits2img(bits, filename):
     f.close()
 
 
+#Encoding functions
 def encodeRGB(carrier, payload_file, password=None, encrypted=False):
-    #Getting the image dimensions and data
-    width, height = carrier.size
-    data = np.uint8(carrier.getdata())
+
+    if type(carrier)==str:
+        carrier = Image.open(carrier)
+    if type(payload_file)==str:
+        payload_file = File.open(payload_file)
+
+    #Getting the image data in array form and its original shape
+    data = np.asarray(carrier)
+    original_shape = data.shape
 
     #Putting pixel data into one straight line
-    data.shape = width * height * 3
+    data.shape = np.prod(original_shape)
 
     #Getting file as a bitstring
     bitstring = payload_file.makeBitstring(password=password, encrypted=encrypted)
 
     #Getting the int values for each bit in the payload
     bits = np.uint8([int(c, 2) for c in bitstring])
+
+    #Making sure that the hidden data will fit in the carrier
+    if len(bits) > len(data):
+        print("Secret file is larger than the carrier! Pick a larger carrier or smaller secret.")
+        exit()
 
     #Getting the same number of bytes from the image data
     modified_data = data[:len(bits)]
@@ -95,16 +108,20 @@ def encodeRGB(carrier, payload_file, password=None, encrypted=False):
     modified_data = setbit(modified_data, 0, bits)
 
     #Adding the new bits back into the image data
-    data[:len(bits)] = modified_data
+    data = np.concatenate((modified_data, data[len(bits):]))
 
     #Reshaping the image data
-    data.shape = (width, height, 3)
+    data.shape = original_shape
     
     #Generating the new image and returning it
-    newImage = Image.fromarray(data)
+    newImage = Image.fromarray(data, mode='RGB')
     return newImage
 
 def decodeRGB(image, password=None):
+
+    if type(image)==str:
+        image = Image.open(image)
+
     #Getting the image size and data
     width, height = image.size
     imgdata = np.uint8(image.getdata())
@@ -116,47 +133,5 @@ def decodeRGB(image, password=None):
     payload_array = [str(x) for x in list(readbit(payload_imgdata, 0))]
     payload_bitstring = ''.join(payload_array)
     
-    return File.fromBitstring(payload_bitstring)
+    return File.fromBitstring(payload_bitstring, password=password)
 
-
-'''
-def encode(options):
-    
-    payload_raw_bytes = bytes()
-
-    #Getting data to be concealed
-    if options['stegtype'] == 'text':
-        payload_raw_bytes = str2bits(options['payload_text'])
-    else:
-        with open(options['payload_path'], 'rb') as f:
-            payload_raw_bytes = f.read()
-
-    stegoimage = encodeRGB(albert, img2bits("cat-icon.png"))
-
-    stegoimage.save("albert-cat-stego.png")
-
-def decode():
-    pass
-
-'''
-
-
-
-
-
-'''
-process = input("(E)ncode or (D)ecode? ")
-
-if process == 'E':
-    payload = input("What message would you like to hide? ")
-
-    image = Image.open("newalbert.png")
-
-    stegimg = encodeRGB(image, str2bits(payload))
-
-    stegimg.save("newalbert.png")
-
-elif process == 'D':
-    key = input("Decode: What is the key? ")
-    decodeRGB(Image.open("newalbert.png"), int(key))
-'''
